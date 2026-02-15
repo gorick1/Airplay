@@ -1,16 +1,5 @@
 {
-  "name": "Alexa AirPlay Bridge Repository",
+  "name": "Alexa AirPlay Bridge",
   "url": "https://github.com/gorick1/Airplay",
-  "maintainer": "gorick1",
-  "codeowners": ["@gorick1"],
-  "addons": {
-    "alexa-airplay": {
-      "name": "Amazon Echo AirPlay Bridge",
-      "description": "Stream Apple Music to Amazon Echo devices via virtual AirPlay receivers with full playback control",
-      "url": "https://github.com/gorick1/Airplay/tree/main/alexa-airplay",
-      "icon": "mdi:speaker-multiple",
-      "logo": "",
-      "docs": "https://github.com/gorick1/Airplay/blob/main/alexa-airplay/README.md"
-    }
-  }
+  "maintainer": "gorick1"
 }
