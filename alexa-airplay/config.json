@@ -1,0 +1,47 @@
+{
+  "name": "Amazon Echo AirPlay Bridge",
+  "version": "1.0.0",
+  "slug": "alexa-airplay",
+  "description": "Stream Apple Music to Amazon Echo devices via virtual AirPlay receivers with full playback control",
+  "url": "https://github.com/yourusername/alexa-airplay-addon",
+  "arch": ["aarch64", "amd64", "armv7", "armhf"],
+  "startup": "services",
+  "boot": "auto",
+  "image": "ghcr.io/yourusername/alexa-airplay-{arch}",
+  "homeassistant_api": true,
+  "hassio_api": true,
+  "hassio_role": "default",
+  "docker_preload": true,
+  "privileged": ["NET_ADMIN"],
+  "host_network": true,
+  "init": true,
+  "panel_icon": "mdi:speaker-multiple",
+  "panel_title": "Alexa AirPlay",
+  "options": {
+    "amazon_client_id": "",
+    "amazon_client_secret": "",
+    "amazon_redirect_uri": "http://localhost:8000/oauth/callback",
+    "device_selection": [],
+    "airplay_port": 5000,
+    "debug_logging": false
+  },
+  "schema": {
+    "amazon_client_id": "str?",
+    "amazon_client_secret": "str?",
+    "amazon_redirect_uri": "str?",
+    "device_selection": ["str"]?,
+    "airplay_port": "port?",
+    "debug_logging": "bool?"
+  },
+  "ports": {
+    "8000/tcp": 8000,
+    "5000/tcp": 5000,
+    "5353/udp": 5353
+  },
+  "ports_description": {
+    "8000/tcp": "Web UI and OAuth callback",
+    "5000/tcp": "AirPlay RTSP/Audio streaming",
+    "5353/udp": "mDNS discovery"
+  },
+  "services": ["mqtt"]
+}
