@@ -1,29 +1,13 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
 FROM ${BUILD_FROM}
 
-# Install system dependencies
+# Install system dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-dev \
     build-essential \
     libssl-dev \
     libffi-dev \
-    libjpeg-dev \
-    libzlib1g-dev \
-    libavahi-client-dev \
-    libavahi-core-dev \
-    avahi-daemon \
-    libasound2-dev \
-    libpulse-dev \
-    libudev-dev \
-    pkg-config \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install shairport-sync for AirPlay receiver capabilities
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    shairport-sync \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -49,8 +33,8 @@ RUN mkdir -p /data/config /data/logs
 EXPOSE 8000 5000 5353/udp
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Run the application
 CMD [ "/app/run.sh" ]

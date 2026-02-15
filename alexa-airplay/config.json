@@ -21,10 +21,19 @@
     "NET_BIND_SERVICE",
     "CHOWN",
     "SETGID",
-    "SETUID"
+    "SETUID",
+    "DAC_OVERRIDE"
   ],
   "read_only": false,
+  "tmpfs": [
+    "/tmp",
+    "/run"
+  ],
+  "environment": {
+    "PYTHONUNBUFFERED": "1"
+  },
   "init": true,
+  "user": "root",
   "panel_icon": "mdi:speaker-multiple",
   "panel_title": "Alexa AirPlay",
   "options": {
