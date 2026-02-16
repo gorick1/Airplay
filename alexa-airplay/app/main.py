@@ -50,9 +50,14 @@ try:
     
     # Import and run the app
     from core.app import AirPlayBridge
+    from core.config import Config
     
     async def main():
-        app = AirPlayBridge()
+        # Load configuration
+        config = Config()
+        
+        # Create and start app
+        app = AirPlayBridge(config)
         await app.start()
         # Keep running
         while True:
