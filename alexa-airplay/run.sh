@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Use wrapper script if it exists, otherwise run directly
+if [ -f /data/start_app.sh ]; then
+    exec /data/start_app.sh
+fi
+
 # Source bashio for logging
 source /usr/lib/bashio/init.sh || true
 

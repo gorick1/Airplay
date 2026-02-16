@@ -43,6 +43,29 @@ class Config:
         
         # Load from config file if it exists
         self._load_from_file()
+        
+        # Also load from addon options if available (overwrites env vars)
+        self._load_from_addon_options()
+    
+    def _load_from_addon_options(self):
+        """Load configuration from Home Assistant addon options file"""
+        options_file = Path("/data/options.json")
+        if options_file.exists():
+            try:
+                with open(options_file, 'r') as f:
+                    data = json.load(f)
+                    # Map addon options to config attributes
+                    if 'amazon_client_id' in data and data['amazon_client_id']:
+                        self.amazon_client_id = data['amazon_client_id']
+                    if 'amazon_client_secret' in data and data['amazon_client_secret']:
+                        self.amazon_client_secret = data['amazon_client_secret']
+                    if 'amazon_redirect_uri' in data and data['amazon_redirect_uri']:
+                        self.amazon_redirect_uri = data['amazon_redirect_uri']
+                    if 'airplay_port' in data:
+                        self.airplay_port = int(data['airplay_port'])
+                logger.info(f"Loaded addon options from {options_file}")
+            except Exception as e:
+                logger.warning(f"Failed to load addon options: {e}")
     
     def _load_from_file(self):
         """Load configuration from file"""
