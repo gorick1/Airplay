@@ -78,13 +78,17 @@ class Config:
     def _load_from_file(self):
         """Load configuration from file"""
         config_file = self.config_dir / "config.json"
+        logger.debug(f"Attempting to load config from: {config_file}")
         if config_file.exists():
             try:
                 with open(config_file, 'r') as f:
                     data = json.load(f)
+                    logger.debug(f"Loaded config data: {list(data.keys())}")
                     for key, value in data.items():
                         if hasattr(self, key):
+                            old_val = getattr(self, key, None)
                             setattr(self, key, value)
+                            logger.debug(f"Set {key}: {old_val} -> {value if key != 'amazon_client_secret' else '***'}")
                 logger.info(f"Loaded configuration from {config_file}")
             except Exception as e:
                 logger.warning(f"Failed to load config file: {e}")
