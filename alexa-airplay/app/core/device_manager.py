@@ -4,12 +4,17 @@ Manages virtual AirPlay device creation and Alexa device mapping
 """
 
 import asyncio
+import json
 import logging
+import os
+import re
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+DEVICES_FILE = "/data/config/devices.json"
 
 
 class PlaybackState(Enum):
@@ -53,20 +58,89 @@ class DeviceManager:
         self.devices: Dict[str, VirtualDevice] = {}
         self.running = False
         self.update_interval = 30  # seconds
+        self._load_devices()
+    
+    # ── persistence ───────────────────────────────────────────
+    def _load_devices(self):
+        """Load manually-added devices from disk."""
+        try:
+            if os.path.exists(DEVICES_FILE):
+                with open(DEVICES_FILE, "r") as f:
+                    data = json.load(f)
+                for d in data:
+                    dev = VirtualDevice(
+                        id=d["id"],
+                        name=d["name"],
+                        alexa_device_id=d.get("alexa_device_id", ""),
+                        type=d.get("type", "device"),
+                    )
+                    self.devices[dev.id] = dev
+                logger.info(f"Loaded {len(self.devices)} device(s) from disk")
+        except Exception as e:
+            logger.error(f"Failed to load devices from disk: {e}")
+
+    def _save_devices(self):
+        """Persist devices to disk."""
+        try:
+            os.makedirs(os.path.dirname(DEVICES_FILE), exist_ok=True)
+            data = [d.to_dict() for d in self.devices.values()]
+            with open(DEVICES_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+            logger.info(f"Saved {len(data)} device(s) to disk")
+        except Exception as e:
+            logger.error(f"Failed to save devices to disk: {e}")
+
+    # ── manual device management ──────────────────────────────
+    def add_manual_device(self, name: str) -> VirtualDevice:
+        """Add a device by name (manual entry)."""
+        # Create a safe ID from the name
+        safe = re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
+        device_id = f"airplay_{safe}"
+
+        # Avoid duplicates
+        if device_id in self.devices:
+            logger.info(f"Device already exists: {name} ({device_id})")
+            return self.devices[device_id]
+
+        device = VirtualDevice(
+            id=device_id,
+            name=name,
+            alexa_device_id=safe,
+            type="device",
+        )
+        self.devices[device_id] = device
+        self._save_devices()
+        logger.info(f"Added manual device: {name} ({device_id})")
+        return device
+
+    def remove_device(self, device_id: str) -> bool:
+        """Remove a single device by ID."""
+        if device_id in self.devices:
+            del self.devices[device_id]
+            self._save_devices()
+            logger.info(f"Removed device: {device_id}")
+            return True
+        return False
+
+    def remove_all_devices(self) -> int:
+        """Remove all devices. Returns count removed."""
+        count = len(self.devices)
+        self.devices.clear()
+        self._save_devices()
+        logger.info(f"Removed all {count} device(s)")
+        return count
     
     async def start(self):
         """Start device manager"""
         self.running = True
-        logger.info("Device Manager started")
-        
-        # Periodically discover and update devices
+        logger.info(
+            "Device Manager started – %d device(s) loaded from disk",
+            len(self.devices),
+        )
+        # Keep the loop alive so the task isn't collected, but there's
+        # nothing to poll since devices are added manually.
         while self.running:
-            try:
-                await self.refresh_devices()
-                await asyncio.sleep(self.update_interval)
-            except Exception as e:
-                logger.error(f"Error in device refresh loop: {e}")
-                await asyncio.sleep(5)
+            await asyncio.sleep(60)
     
     async def stop(self):
         """Stop device manager"""
@@ -74,53 +148,9 @@ class DeviceManager:
         logger.info("Device Manager stopped")
     
     async def refresh_devices(self):
-        """Discover and refresh Alexa devices"""
-        try:
-            if not self.amazon_client.authenticated:
-                logger.debug("Not authenticated, skipping device refresh")
-                return
-            
-            logger.info("Refreshing Alexa devices...")
-            alexa_devices = await self.amazon_client.get_devices()
-            logger.info(f"Amazon API returned {len(alexa_devices)} device(s)")
-            
-            if not alexa_devices:
-                logger.warning("No devices returned from Amazon API")
-                return
-
-            # Create virtual devices for each Alexa device
-            new_count = 0
-            for device in alexa_devices:
-                device_id = device.get("id", "")
-                device_name = device.get("name", f"Device {device_id}")
-                device_type = device.get("type", "device")
-                
-                if not device_id:
-                    logger.debug(f"Skipping device with no ID: {device}")
-                    continue
-
-                # Create or update virtual device
-                virtual_id = f"airplay_{device_id}"
-                if virtual_id not in self.devices:
-                    virtual_device = VirtualDevice(
-                        id=virtual_id,
-                        name=device_name,
-                        alexa_device_id=device_id,
-                        type="device"
-                    )
-                    self.devices[virtual_id] = virtual_device
-                    new_count += 1
-                    logger.info(f"  Created virtual device: {device_name} ({device_id})")
-                else:
-                    # Update name in case it changed
-                    self.devices[virtual_id].name = device_name
-            
-            logger.info(
-                f"Device refresh complete: {new_count} new, "
-                f"{len(self.devices)} total virtual devices"
-            )
-        except Exception as e:
-            logger.error(f"Error refreshing devices: {e}")
+        """Reload devices from disk (manual-entry model)."""
+        self._load_devices()
+        logger.info(f"Refreshed devices from disk – {len(self.devices)} device(s)")
     
     def get_device(self, device_id: str) -> Optional[VirtualDevice]:
         """Get a device by ID"""

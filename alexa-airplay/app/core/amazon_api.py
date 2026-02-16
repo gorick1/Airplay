@@ -96,7 +96,7 @@ class AmazonAPIClient:
         import urllib.parse
         params = {
             "client_id": self.config.amazon_client_id,
-            "scope": "alexa:all alexa::devices:all:address:read profile",
+            "scope": "alexa:all profile",
             "scope_data": json.dumps({
                 "alexa:all": {"productID": "AlexaAirPlayBridge", "productInstanceAttributes": {"deviceSerialNumber": "001"}},
             }),

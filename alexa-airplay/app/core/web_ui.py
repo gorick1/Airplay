@@ -106,10 +106,23 @@ button{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:
 <div class="card">
   <h2>Devices</h2>
   <ul id="deviceList" class="device-list">
-    <li><span class="device-state">Authorize with Amazon to discover devices.</span></li>
+    <li><span class="device-state">No devices added yet. Add your Echo devices below.</span></li>
   </ul>
   <div class="btn-row">
-    <button class="btn-primary" onclick="loadDevices()">Refresh Devices</button>
+    <button class="btn-primary" onclick="loadDevices()">Refresh</button>
+    <button class="btn-danger" onclick="removeAllDevices()">Remove All</button>
+  </div>
+  <h2 style="margin-top:20px">Add Echo Device</h2>
+  <p style="color:var(--muted);font-size:.85em;margin-bottom:10px">
+    Enter the name of your Echo device exactly as shown in the Alexa app
+    (e.g. "Living Room Echo", "Kitchen Echo Dot").
+  </p>
+  <div style="display:flex;gap:8px;align-items:end">
+    <div style="flex:1">
+      <label for="newDeviceName">Device Name</label>
+      <input type="text" id="newDeviceName" placeholder="e.g. Living Room Echo">
+    </div>
+    <button class="btn-success" onclick="addDevice()" style="height:40px">Add Device</button>
   </div>
 </div>
 
@@ -250,24 +263,78 @@ async function exchangeCode() {
 /* ────────── Devices ────────── */
 async function loadDevices() {
   try {
-    const r = await fetch(apiUrl('api/devices?refresh=1'), {credentials:'same-origin'});
+    const r = await fetch(apiUrl('api/devices'), {credentials:'same-origin'});
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const ul = document.getElementById('deviceList');
-    if (!d.authenticated) {
-      ul.innerHTML = '<li><span class="device-state">Authorize with Amazon first to discover devices.</span></li>';
-      return;
-    }
     if (!d.devices || d.devices.length === 0) {
-      ul.innerHTML = '<li><span class="device-state">No devices found. Check add-on logs for details.</span></li>';
+      ul.innerHTML = '<li><span class="device-state">No devices added yet. Add your Echo devices below.</span></li>';
       return;
     }
     ul.innerHTML = d.devices.map(dev =>
-      '<li><span class="device-name">' + (dev.name||dev.id) + '</span>' +
-      '<span class="device-state">' + (dev.state||dev.type||'unknown') + '</span></li>'
+      '<li>' +
+        '<span class="device-name">' + (dev.name||dev.id) + '</span>' +
+        '<span class="device-state">' + (dev.state||'stopped') + '</span>' +
+        '<button onclick="removeDevice(\'' + dev.id + '\')" ' +
+          'style="margin-left:auto;background:#e74c3c;color:#fff;border:none;' +
+          'border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8em">&times;</button>' +
+      '</li>'
     ).join('');
   } catch(e) {
     console.error('loadDevices:', e);
+  }
+}
+
+async function addDevice() {
+  const input = document.getElementById('newDeviceName');
+  const name = (input.value || '').trim();
+  if (!name) { showMsg('Please enter a device name', false); return; }
+  try {
+    const r = await fetch(apiUrl('api/devices'), {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: name}),
+      credentials: 'same-origin'
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    showMsg(d.message || 'Device added', true);
+    input.value = '';
+    loadDevices();
+  } catch(e) {
+    showMsg('Failed to add device: ' + e.message, false);
+  }
+}
+
+async function removeDevice(deviceId) {
+  if (!confirm('Remove this device?')) return;
+  try {
+    const r = await fetch(apiUrl('api/devices/' + deviceId), {
+      method: 'DELETE',
+      credentials: 'same-origin'
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    showMsg(d.message || 'Device removed', true);
+    loadDevices();
+  } catch(e) {
+    showMsg('Failed to remove device: ' + e.message, false);
+  }
+}
+
+async function removeAllDevices() {
+  if (!confirm('Remove all devices?')) return;
+  try {
+    const r = await fetch(apiUrl('api/devices'), {
+      method: 'DELETE',
+      credentials: 'same-origin'
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    showMsg(d.message || 'All devices removed', true);
+    loadDevices();
+  } catch(e) {
+    showMsg('Failed to remove devices: ' + e.message, false);
   }
 }
 
@@ -275,6 +342,7 @@ async function loadDevices() {
 document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
   loadRedirectUri();
+  loadDevices();
 });
 </script>
 </body>
@@ -299,6 +367,9 @@ class WebUIServer:
         self.app.router.add_get('/api/config', self._handle_get_config)
         self.app.router.add_post('/api/config', self._handle_save_config)
         self.app.router.add_get('/api/devices', self._handle_get_devices)
+        self.app.router.add_post('/api/devices', self._handle_add_device)
+        self.app.router.add_delete('/api/devices', self._handle_remove_all_devices)
+        self.app.router.add_delete('/api/devices/{device_id}', self._handle_remove_device)
         self.app.router.add_get('/api/debug/probe', self._handle_debug_probe)
         self.app.router.add_get('/api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('/api/oauth/url', self._handle_oauth_url)
@@ -312,6 +383,9 @@ class WebUIServer:
         self.app.router.add_get('////api/config', self._handle_get_config)
         self.app.router.add_post('////api/config', self._handle_save_config)
         self.app.router.add_get('////api/devices', self._handle_get_devices)
+        self.app.router.add_post('////api/devices', self._handle_add_device)
+        self.app.router.add_delete('////api/devices', self._handle_remove_all_devices)
+        self.app.router.add_delete('////api/devices/{device_id}', self._handle_remove_device)
         self.app.router.add_get('////api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('////api/oauth/url', self._handle_oauth_url)
         self.app.router.add_post('////api/oauth/exchange', self._handle_oauth_exchange)
@@ -345,6 +419,14 @@ class WebUIServer:
             return await self._handle_save_config(request)
         if normalized == '/api/devices' and request.method == 'GET':
             return await self._handle_get_devices(request)
+        if normalized == '/api/devices' and request.method == 'POST':
+            return await self._handle_add_device(request)
+        if normalized == '/api/devices' and request.method == 'DELETE':
+            return await self._handle_remove_all_devices(request)
+        if normalized.startswith('/api/devices/') and request.method == 'DELETE':
+            device_id = normalized.split('/api/devices/', 1)[1].rstrip('/')
+            if device_id:
+                return await self._handle_remove_device_by_id(device_id)
         if normalized == '/api/oauth/redirect-uri' and request.method == 'GET':
           return await self._handle_oauth_redirect_uri(request)
         if normalized == '/api/oauth/url' and request.method == 'GET':
@@ -426,6 +508,50 @@ class WebUIServer:
         except Exception as e:
             logger.error(f"Error getting devices: {e}")
             return web.json_response({"devices": [], "error": str(e)})
+
+    # ── POST /api/devices ─────────────────────────────────────
+    async def _handle_add_device(self, request: web.Request) -> web.Response:
+        """Add a manual Echo device by name."""
+        try:
+            data = await request.json()
+            name = (data.get("name") or "").strip()
+            if not name:
+                return web.json_response({"error": "Device name is required"}, status=400)
+            device = self.device_manager.add_manual_device(name)
+            return web.json_response({
+                "message": f"Device '{name}' added",
+                "device": device.to_dict(),
+            })
+        except Exception as e:
+            logger.error(f"Error adding device: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ── DELETE /api/devices ───────────────────────────────────
+    async def _handle_remove_all_devices(self, request: web.Request) -> web.Response:
+        """Remove all devices."""
+        try:
+            count = self.device_manager.remove_all_devices()
+            return web.json_response({"message": f"Removed {count} device(s)"})
+        except Exception as e:
+            logger.error(f"Error removing all devices: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ── DELETE /api/devices/{device_id} ───────────────────────
+    async def _handle_remove_device(self, request: web.Request) -> web.Response:
+        """Remove a single device by ID."""
+        device_id = request.match_info.get("device_id", "")
+        return await self._handle_remove_device_by_id(device_id)
+
+    async def _handle_remove_device_by_id(self, device_id: str) -> web.Response:
+        """Remove a single device by ID (shared helper)."""
+        try:
+            ok = self.device_manager.remove_device(device_id)
+            if not ok:
+                return web.json_response({"error": "Device not found"}, status=404)
+            return web.json_response({"message": "Device removed"})
+        except Exception as e:
+            logger.error(f"Error removing device: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     # ── GET /api/debug/probe ─────────────────────────────────
     async def _handle_debug_probe(self, request: web.Request) -> web.Response:
