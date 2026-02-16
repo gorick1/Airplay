@@ -26,5 +26,5 @@ RUN mkdir -p /data/config /data/logs && \
 # Expose ports
 EXPOSE 8000 5001
 
-# Run the startup script
-CMD ["/start.sh"]
+# Use ENTRYPOINT to ensure the script runs
+ENTRYPOINT ["/start.sh"]
