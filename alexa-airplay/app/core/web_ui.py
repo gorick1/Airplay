@@ -24,13 +24,29 @@ class WebUIServer:
         self.runner: Optional[web.AppRunner] = None
         self.site: Optional[web.TCPSite] = None
     
+    async def _cors_middleware(self, app, handler):
+        """CORS middleware to allow POST requests from ingress"""
+        async def middleware_handler(request):
+            if request.method == 'OPTIONS':
+                return web.Response(status=200, headers={
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                })
+            response = await handler(request)
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+        return middleware_handler
+    
     async def start(self):
         """Start web UI server"""
         try:
             logger.info(f"Starting Web UI on port {self.config.web_port}")
             
-            # Create aiohttp app
-            self.app = web.Application()
+            # Create aiohttp app with middleware
+            self.app = web.Application(middlewares=[self._cors_middleware])
             
             # Setup routes
             self._setup_routes()
