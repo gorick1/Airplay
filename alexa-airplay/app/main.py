@@ -1,74 +1,60 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Alexa AirPlay Bridge addon.
+Alexa AirPlay Bridge - Main Application
+Bridges Amazon Echo devices to virtual AirPlay receivers
 """
 
-import sys
-import os
-import logging
 import asyncio
+import os
+import sys
+import logging
 from pathlib import Path
-
-# Setup directories
-CONFIG_DIR = Path("/data/config")
-LOG_DIR = Path("/data/logs")
-CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Setup logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(
-    level=getattr(logging, log_level.upper(), logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / "addon.log")
-    ]
+    level=getattr(logging, log_level),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alexa-airplay")
 
-# Environment setup
-os.environ.setdefault("ADDON_DIR", "/app")
-os.environ.setdefault("DATA_DIR", "/data")
-os.environ.setdefault("CONFIG_DIR", str(CONFIG_DIR))
-os.environ.setdefault("LOG_DIR", str(LOG_DIR))
-os.environ.setdefault("LOG_LEVEL", log_level)
-os.environ.setdefault("AIRPLAY_PORT", "5001")
-os.environ.setdefault("HA_URL", "http://supervisor")
-os.environ.setdefault("HA_TOKEN", os.getenv("SUPERVISOR_TOKEN", ""))
+# Add app to path
+sys.path.insert(0, str(Path(__file__).parent))
 
-logger.info("=" * 60)
-logger.info("Starting Alexa AirPlay Bridge addon...")
-logger.info(f"Log level: {log_level}")
-logger.info(f"AirPlay Port: {os.getenv('AIRPLAY_PORT')}")
-logger.info(f"Data directory: /data")
-logger.info("=" * 60)
+from core.app import AirPlayBridge
+from core.config import load_config
 
-try:
-    # Add the app directory to Python path
-    sys.path.insert(0, "/app")
-    
-    # Import and run the app
-    from core.app import AirPlayBridge
-    from core.config import Config
-    
-    async def main():
-        # Load configuration
-        config = Config()
+
+async def main():
+    """Main application entry point"""
+    try:
+        logger.info("Initializing Alexa AirPlay Bridge...")
         
-        # Create and start app
-        app = AirPlayBridge(config)
-        await app.start()
+        # Load configuration
+        config = load_config()
+        logger.info(f"Configuration loaded - Redirect URI: {config.amazon_redirect_uri}")
+        
+        # Initialize the bridge
+        bridge = AirPlayBridge(config)
+        
+        # Start the bridge
+        logger.info("Starting AirPlay Bridge services...")
+        await bridge.start()
+        
         # Keep running
+        logger.info("Alexa AirPlay Bridge is running")
         while True:
-            await asyncio.sleep(3600)
-    
-    # Run the async main loop
-    asyncio.run(main())
-    
-except KeyboardInterrupt:
-    logger.info("Received interrupt signal, shutting down...")
-    sys.exit(0)
-except Exception as e:
-    logger.exception(f"Fatal error: {e}")
-    sys.exit(1)
+            await asyncio.sleep(1)
+            
+    except KeyboardInterrupt:
+        logger.info("Received interrupt signal")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Shutdown complete")
