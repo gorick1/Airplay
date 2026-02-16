@@ -218,6 +218,15 @@ class WebUIServer:
         self.app.router.add_get('/api/devices', self._handle_get_devices)
         self.app.router.add_get('/api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('/oauth/callback', self._handle_oauth_callback)
+        # In some HA ingress paths, upstream sends 4 leading slashes.
+        # Register explicit aliases so these routes still resolve.
+        self.app.router.add_get('////', self._handle_index)
+        self.app.router.add_get('////health', self._handle_health)
+        self.app.router.add_get('////api/config', self._handle_get_config)
+        self.app.router.add_post('////api/config', self._handle_save_config)
+        self.app.router.add_get('////api/devices', self._handle_get_devices)
+        self.app.router.add_get('////api/oauth/authorize', self._handle_oauth_start)
+        self.app.router.add_get('////oauth/callback', self._handle_oauth_callback)
         # Home Assistant ingress can occasionally forward paths like "////".
         # Catch anything unmatched and normalize repeated leading slashes.
         self.app.router.add_route('*', '/{tail:.*}', self._handle_catch_all)
