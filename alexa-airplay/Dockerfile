@@ -15,16 +15,12 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy application code
 COPY app ./app
-COPY run.sh .
-
-# Make run script executable
-RUN chmod +x run.sh
 
 # Create data directories
 RUN mkdir -p /data/config /data/logs
 
+# Copy s6-overlay service files
+COPY rootfs /
+
 # Expose ports
 EXPOSE 8000 5001
-
-# Run the application
-CMD [ "/app/run.sh" ]
