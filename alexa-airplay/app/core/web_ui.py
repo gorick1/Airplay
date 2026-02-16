@@ -218,6 +218,48 @@ class WebUIServer:
         self.app.router.add_get('/api/devices', self._handle_get_devices)
         self.app.router.add_get('/api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('/oauth/callback', self._handle_oauth_callback)
+        # Home Assistant ingress can occasionally forward paths like "////".
+        # Catch anything unmatched and normalize repeated leading slashes.
+        self.app.router.add_route('*', '/{tail:.*}', self._handle_catch_all)
+
+    async def _handle_catch_all(self, request: web.Request) -> web.StreamResponse:
+        """Normalize malformed ingress paths and dispatch to the intended handler.
+
+        Example malformed paths observed in production:
+        - ////
+        - ////api/config
+        """
+        raw_path = request.path or '/'
+        normalized = '/' + '/'.join(part for part in raw_path.split('/') if part)
+        if normalized == '//':
+            normalized = '/'
+
+        logger.warning(f"Unmatched route path={raw_path!r}, normalized={normalized!r}, method={request.method}")
+
+        if normalized == '/' and request.method == 'GET':
+            return await self._handle_index(request)
+        if normalized == '/health' and request.method == 'GET':
+            return await self._handle_health(request)
+        if normalized == '/api/config' and request.method == 'GET':
+            return await self._handle_get_config(request)
+        if normalized == '/api/config' and request.method == 'POST':
+            return await self._handle_save_config(request)
+        if normalized == '/api/devices' and request.method == 'GET':
+            return await self._handle_get_devices(request)
+        if normalized == '/api/oauth/authorize' and request.method == 'GET':
+            return await self._handle_oauth_start(request)
+        if normalized == '/oauth/callback' and request.method == 'GET':
+            return await self._handle_oauth_callback(request)
+
+        return web.json_response(
+            {
+                "error": "Not Found",
+                "path": raw_path,
+                "normalized_path": normalized,
+                "method": request.method,
+            },
+            status=404,
+        )
 
     # ── index ─────────────────────────────────────────────────
     async def _handle_index(self, request: web.Request) -> web.Response:
