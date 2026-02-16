@@ -6,6 +6,7 @@ Fully compatible with Home Assistant Ingress proxy.
 
 import json
 import logging
+from urllib.parse import urlparse
 from aiohttp import web
 
 logger = logging.getLogger(__name__)
@@ -366,7 +367,22 @@ class WebUIServer:
                 'X-Forwarded-Host',
                 request.headers.get('Host', 'homeassistant.local')
             )
-            scheme = request.headers.get('X-Forwarded-Proto', 'http')
+            scheme = request.headers.get('X-Forwarded-Proto', '').strip()
+
+            # Some ingress setups do not forward the external scheme reliably.
+            # Prefer scheme from browser-origin headers, and default to https.
+            if not scheme:
+                origin = request.headers.get('Origin', '').strip()
+                referer = request.headers.get('Referer', '').strip()
+                source = origin or referer
+                if source:
+                    parsed = urlparse(source)
+                    if parsed.scheme:
+                        scheme = parsed.scheme
+
+            if not scheme:
+                scheme = 'https'
+
             return f"{scheme}://{host}{ingress_path}/oauth/callback"
 
         if self.config.amazon_redirect_uri:
