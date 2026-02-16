@@ -357,27 +357,27 @@ class WebUIServer:
             logger.error(f"Error getting devices: {e}")
             return web.json_response({"devices": [], "error": str(e)})
 
-        def _resolve_redirect_uri(self, request: web.Request) -> str:
-          """Build the exact redirect URI used for Amazon OAuth."""
-          ingress_path = request.headers.get('X-Ingress-Path', '').rstrip('/')
+    def _resolve_redirect_uri(self, request: web.Request) -> str:
+        """Build the exact redirect URI used for Amazon OAuth."""
+        ingress_path = request.headers.get('X-Ingress-Path', '').rstrip('/')
 
-          if ingress_path:
+        if ingress_path:
             host = request.headers.get(
-              'X-Forwarded-Host',
-              request.headers.get('Host', 'homeassistant.local')
+                'X-Forwarded-Host',
+                request.headers.get('Host', 'homeassistant.local')
             )
             scheme = request.headers.get('X-Forwarded-Proto', 'http')
             return f"{scheme}://{host}{ingress_path}/oauth/callback"
 
-          if self.config.amazon_redirect_uri:
+        if self.config.amazon_redirect_uri:
             return self.config.amazon_redirect_uri
 
-          host = request.headers.get('Host', 'localhost:8099')
-          return f"http://{host.rstrip('/')}/oauth/callback"
+        host = request.headers.get('Host', 'localhost:8099')
+        return f"http://{host.rstrip('/')}/oauth/callback"
 
-        async def _handle_oauth_redirect_uri(self, request: web.Request) -> web.Response:
-          redirect_uri = self._resolve_redirect_uri(request)
-          return web.json_response({"redirect_uri": redirect_uri})
+    async def _handle_oauth_redirect_uri(self, request: web.Request) -> web.Response:
+        redirect_uri = self._resolve_redirect_uri(request)
+        return web.json_response({"redirect_uri": redirect_uri})
 
     # ── OAuth start ───────────────────────────────────────────
     async def _handle_oauth_start(self, request: web.Request) -> web.Response:
