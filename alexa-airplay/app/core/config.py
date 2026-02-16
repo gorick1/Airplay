@@ -112,10 +112,11 @@ class Config:
             logger.error(f"Failed to save config: {e}")
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert config to dictionary"""
+        """Convert config to dictionary for web UI"""
         return {
             "amazon_client_id": self.amazon_client_id,
-            "amazon_client_secret": "***" if self.amazon_client_secret else "",
+            "amazon_client_secret": self.amazon_client_secret,  # UI needs to show current secret
+            "amazon_redirect_uri": self.amazon_redirect_uri,
             "airplay_port": self.airplay_port,
             "web_port": self.web_port,
             "debug": self.debug,
