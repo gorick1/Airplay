@@ -6,6 +6,7 @@ Handles OAuth, device discovery, and playback control
 import asyncio
 import json
 import logging
+import time
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import aiohttp
@@ -122,6 +123,57 @@ class AmazonAPIClient:
         
         if self.token_expiry and datetime.now() >= self.token_expiry:
             await self.refresh_access_token()
+
+    @staticmethod
+    def _normalize_devices(payload: Dict) -> List[Dict]:
+        """Normalize multiple Alexa payload shapes into id/name/type entries."""
+        candidates = []
+        if isinstance(payload, dict):
+            for key in ("devices", "device", "endpoints"):
+                value = payload.get(key)
+                if isinstance(value, list):
+                    candidates = value
+                    break
+
+        normalized: List[Dict] = []
+        for raw in candidates:
+            if not isinstance(raw, dict):
+                continue
+
+            device_id = (
+                raw.get("id")
+                or raw.get("serialNumber")
+                or raw.get("deviceSerialNumber")
+                or raw.get("endpointId")
+                or raw.get("accountName")
+            )
+            if not device_id:
+                continue
+
+            name = (
+                raw.get("name")
+                or raw.get("accountName")
+                or raw.get("deviceFamily")
+                or raw.get("friendlyName")
+                or f"Echo {device_id}"
+            )
+
+            device_type = (
+                raw.get("type")
+                or raw.get("deviceType")
+                or raw.get("deviceFamily")
+                or "device"
+            )
+
+            normalized.append(
+                {
+                    "id": str(device_id),
+                    "name": str(name),
+                    "type": str(device_type),
+                }
+            )
+
+        return normalized
     
     async def get_devices(self) -> List[Dict]:
         """Get list of Echo devices"""
@@ -130,19 +182,40 @@ class AmazonAPIClient:
             await self.init_session()
             
             headers = {"Authorization": f"Bearer {self.access_token}"}
-            
-            async with self.session.get(
+
+            endpoints = [
                 f"{AMAZON_API_BASE}/v1/devices",
-                headers=headers
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    devices = data.get("devices", [])
-                    logger.info(f"Retrieved {len(devices)} devices from Amazon")
-                    return devices
-                else:
-                    logger.error(f"Failed to get devices: {resp.status}")
-                    return []
+                f"{AMAZON_API_BASE}/v2/devices",
+                f"{AMAZON_API_BASE}/v1/endpoints",
+                f"{AMAZON_API_BASE}/api/devices-v2/device?cached=true&_={int(time.time() * 1000)}",
+            ]
+
+            for url in endpoints:
+                try:
+                    async with self.session.get(url, headers=headers) as resp:
+                        text = await resp.text()
+
+                        if resp.status != 200:
+                            logger.warning(f"Device endpoint failed ({resp.status}): {url}")
+                            continue
+
+                        try:
+                            data = json.loads(text)
+                        except Exception:
+                            logger.warning(f"Device endpoint returned non-JSON payload: {url}")
+                            continue
+
+                        devices = self._normalize_devices(data)
+                        if devices:
+                            logger.info(f"Retrieved {len(devices)} devices from Amazon ({url})")
+                            return devices
+
+                        logger.warning(f"No devices in payload from endpoint: {url}")
+                except Exception as endpoint_error:
+                    logger.warning(f"Device endpoint error for {url}: {endpoint_error}")
+
+            logger.error("Failed to get devices from all known endpoints")
+            return []
         except Exception as e:
             logger.error(f"Error getting devices: {e}")
             return []
