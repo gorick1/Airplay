@@ -21,11 +21,11 @@ AMAZON_API_BASE = "https://api.amazonalexa.com"
 
 # Device discovery endpoints to try (in priority order)
 DEVICE_ENDPOINTS = [
-    {"url": "/v2/endpoints", "type": "endpoints_v2"},
-    {"url": "/v1/endpoints", "type": "endpoints_v1"},
-    {"url": "/v2/devices", "type": "devices_v2"},
-    {"url": "/v1/devices", "type": "devices_v1"},
-    {"url": "/v1/alexaApiGateway/devices", "type": "gateway_devices"},
+    {"url": "https://api.amazonalexa.com/v2/endpoints", "type": "endpoints_v2"},
+    {"url": "https://api.amazonalexa.com/v1/endpoints", "type": "endpoints_v1"},
+    {"url": "https://alexa.amazon.com/api/devices-v2/device?cached=true", "type": "alexa_web_cached"},
+    {"url": "https://alexa.amazon.com/api/devices-v2/device", "type": "alexa_web"},
+    {"url": "https://api.amazonalexa.com/v1/devices", "type": "devices_v1"},
 ]
 
 # Additional probe URLs for debugging (used by probe_all_endpoints)
@@ -93,13 +93,17 @@ class AmazonAPIClient:
             logger.info("Closed HTTP session")
 
     def get_oauth_url(self) -> str:
+        import urllib.parse
         params = {
             "client_id": self.config.amazon_client_id,
-            "scope": "alexa:all",
+            "scope": "alexa:all alexa::devices:all:address:read profile",
+            "scope_data": json.dumps({
+                "alexa:all": {"productID": "AlexaAirPlayBridge", "productInstanceAttributes": {"deviceSerialNumber": "001"}},
+            }),
             "response_type": "code",
             "redirect_uri": self.config.amazon_redirect_uri,
         }
-        query_string = "&".join([f"{k}={v}" for k, v in params.items()])
+        query_string = urllib.parse.urlencode(params)
         return f"{AMAZON_AUTH_URL}?{query_string}"
 
     async def exchange_code_for_token(self, code: str) -> bool:
@@ -175,7 +179,7 @@ class AmazonAPIClient:
             }
 
             for ep in DEVICE_ENDPOINTS:
-                url = f"{AMAZON_API_BASE}{ep['url']}"
+                url = ep["url"]
                 ep_type = ep["type"]
                 try:
                     logger.info(f"Trying device endpoint: {url}")
