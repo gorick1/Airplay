@@ -19,8 +19,8 @@ export LOG_DIR="/data/logs"
 # Create directories if they don't exist
 mkdir -p "$CONFIG_DIR" "$LOG_DIR"
 
-# Set logging level to DEBUG for troubleshooting
-export LOG_LEVEL="DEBUG"
+# Set logging level (can be set via addon options)
+export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
 # Get configuration
 AMAZON_CLIENT_ID=$(bashio::config 'amazon_client_id' 2>/dev/null || echo "")

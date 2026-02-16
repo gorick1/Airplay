@@ -110,12 +110,26 @@ class WebUIServer:
                 </div>
                 
                 <div class="card">
-                    <h2>Configuration</h2>
+                    <h2>Amazon Configuration</h2>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                        Enter your Amazon Login with Alexa credentials below. Get them from your <a href="https://developer.amazon.com/en-US/docs/alexa/alexa-skills-kit/register-a-product-and-create-security-profile.html" target="_blank" style="color: #FF9900;">Amazon Developer Console</a>.
+                    </p>
+                    
                     <label>Client ID:</label>
-                    <input type="text" id="clientId" placeholder="Amazon Client ID">
+                    <input type="text" id="clientId" placeholder="amzn1.application-oa2-client.xxxxxxxx">
+                    
                     <label>Client Secret:</label>
-                    <input type="password" id="clientSecret" placeholder="Amazon Client Secret">
-                    <button class="btn" onclick="saveConfig()">Save Configuration</button>
+                    <input type="password" id="clientSecret" placeholder="Your client secret">
+                    
+                    <label>OAuth Redirect URI (for Amazon):</label>
+                    <input type="text" id="redirectUri" readonly style="background: #f9f9f9; color: #999;">
+                    <small style="color: #999; display: block; margin-top: 5px;">Copy this URI and paste it in your Amazon Developer Console under "Allowed Return URLs"</small>
+                    
+                    <label>AirPlay Port:</label>
+                    <input type="number" id="airplayPort" placeholder="5001" min="1000" max="65535">
+                    
+                    <button class="btn" onclick="saveConfig()" style="margin-top: 20px; width: 100%;">💾 Save Configuration</button>
+                    <div id="configMessage" style="margin-top: 10px; padding: 10px; border-radius: 4px; text-align: center; display: none;"></div>
                 </div>
             </div>
             
@@ -148,21 +162,60 @@ class WebUIServer:
                 }
                 
                 function saveConfig() {
+                    const clientId = document.getElementById('clientId').value.trim();
+                    const clientSecret = document.getElementById('clientSecret').value.trim();
+                    const airplayPort = document.getElementById('airplayPort').value || 5001;
+                    
+                    if (!clientId || !clientSecret) {
+                        showMessage('Please enter both Client ID and Client Secret', 'error');
+                        return;
+                    }
+                    
                     const config = {
-                        amazon_client_id: document.getElementById('clientId').value,
-                        amazon_client_secret: document.getElementById('clientSecret').value,
+                        amazon_client_id: clientId,
+                        amazon_client_secret: clientSecret,
+                        airplay_port: parseInt(airplayPort),
                     };
+                    
                     fetch('/api/config', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(config)
                     })
                     .then(r => r.json())
-                    .then(data => alert('Configuration saved!'))
-                    .catch(e => alert('Failed to save: ' + e));
+                    .then(data => {
+                        if (data.status === 'success') {
+                            showMessage('✓ Configuration saved! Please restart the addon for changes to take effect.', 'success');
+                        } else {
+                            showMessage('Error: ' + (data.message || 'Unknown error'), 'error');
+                        }
+                    })
+                    .catch(e => showMessage('Failed to save: ' + e, 'error'));
                 }
                 
-                // Load devices on page load and refresh every 5 seconds
+                function showMessage(msg, type) {
+                    const msgDiv = document.getElementById('configMessage');
+                    msgDiv.textContent = msg;
+                    msgDiv.style.display = 'block';
+                    msgDiv.style.background = type === 'success' ? '#d4edda' : '#f8d7da';
+                    msgDiv.style.color = type === 'success' ? '#155724' : '#721c24';
+                    msgDiv.style.border = type === 'success' ? '1px solid #c3e6cb' : '1px solid #f5c6cb';
+                }
+                
+                function loadConfig() {
+                    fetch('/api/config')
+                        .then(r => r.json())
+                        .then(data => {
+                            document.getElementById('clientId').value = data.amazon_client_id || '';
+                            document.getElementById('clientSecret').value = data.amazon_client_secret || '';
+                            document.getElementById('redirectUri').value = data.amazon_redirect_uri || '';
+                            document.getElementById('airplayPort').value = data.airplay_port || 5001;
+                        })
+                        .catch(e => console.error('Failed to load config:', e));
+                }
+                
+                // Load config and devices on page load
+                loadConfig();
                 loadDevices();
                 setInterval(loadDevices, 5000);
             </script>

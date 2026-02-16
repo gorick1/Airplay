@@ -24,7 +24,7 @@ class Config:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
-        # Amazon credentials
+        # Amazon credentials - try environment first, then load from file
         self.amazon_client_id = os.getenv("AMAZON_CLIENT_ID", "")
         self.amazon_client_secret = os.getenv("AMAZON_CLIENT_SECRET", "")
         self.amazon_redirect_uri = os.getenv("AMAZON_REDIRECT_URI", "http://localhost:8000/oauth/callback")

@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 
 # Setup logging
-log_level = os.getenv("LOG_LEVEL", "DEBUG")  # Default to DEBUG for troubleshooting
+log_level = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(
     level=getattr(logging, log_level),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
