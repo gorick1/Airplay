@@ -1,6 +1,6 @@
 aiohttp==3.9.1
 requests==2.31.0
-python-zeroconf==11.2.0
+zeroconf>=0.127.0
 PyYAML==6.0.1
 python-dateutil==2.8.2
 aiofiles==23.2.1
