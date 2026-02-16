@@ -24,30 +24,13 @@ class WebUIServer:
         self.runner: Optional[web.AppRunner] = None
         self.site: Optional[web.TCPSite] = None
     
-    @staticmethod
-    async def _cors_middleware_factory(app, handler):
-        """CORS middleware factory for aiohttp"""
-        async def middleware_handler(request):
-            if request.method == 'OPTIONS':
-                return web.Response(status=200, headers={
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-                })
-            response = await handler(request)
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-            return response
-        return middleware_handler
-    
     async def start(self):
         """Start web UI server"""
         try:
             logger.info(f"Starting Web UI on port {self.config.web_port}")
             
-            # Create aiohttp app with CORS middleware
-            self.app = web.Application(middlewares=[self._cors_middleware_factory])
+            # Create aiohttp app
+            self.app = web.Application()
             
             # Setup routes
             self._setup_routes()
@@ -79,6 +62,7 @@ class WebUIServer:
         self.app.router.add_get("/health", self.handle_health)
         self.app.router.add_get("/api/config", self.handle_get_config)
         self.app.router.add_post("/api/config", self.handle_set_config)
+        self.app.router.add_options("/api/config", self.handle_options)
         self.app.router.add_get("/api/devices", self.handle_get_devices)
         self.app.router.add_get("/api/oauth/authorize", self.handle_oauth_authorize)
         self.app.router.add_get("/oauth/callback", self.handle_oauth_callback)
@@ -254,6 +238,14 @@ class WebUIServer:
             "status": "healthy",
             "authenticated": self.amazon_client.authenticated,
             "devices": len(self.device_manager.get_all_devices())
+        })
+    
+    async def handle_options(self, request):
+        """Handle OPTIONS requests for CORS preflight"""
+        return web.Response(status=204, headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
         })
     
     async def handle_get_config(self, request):
