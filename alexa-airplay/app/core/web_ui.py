@@ -199,9 +199,22 @@ async function saveConfig() {
 }
 
 /* ────────── OAuth ────────── */
-function startOAuth() {
-  // Navigate in the same window; the server builds the full Amazon URL
-  window.location.href = apiUrl('api/oauth/authorize');
+async function startOAuth() {
+  try {
+    // Get direct Amazon URL and open outside ingress iframe.
+    const r = await fetch(apiUrl('api/oauth/url'), {credentials:'same-origin'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (!d.oauth_url) throw new Error('Missing oauth_url');
+
+    const popup = window.open(d.oauth_url, '_blank', 'noopener,noreferrer');
+    if (!popup) {
+      // Popup blocked: try top-level navigation (break out of iframe)
+      window.top.location.href = d.oauth_url;
+    }
+  } catch (e) {
+    showMsg('Failed to open Amazon authorization: ' + e.message, false);
+  }
 }
 
 /* ────────── Devices ────────── */
@@ -253,6 +266,7 @@ class WebUIServer:
         self.app.router.add_post('/api/config', self._handle_save_config)
         self.app.router.add_get('/api/devices', self._handle_get_devices)
         self.app.router.add_get('/api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
+        self.app.router.add_get('/api/oauth/url', self._handle_oauth_url)
         self.app.router.add_get('/api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('/oauth/callback', self._handle_oauth_callback)
         # In some HA ingress paths, upstream sends 4 leading slashes.
@@ -263,6 +277,7 @@ class WebUIServer:
         self.app.router.add_post('////api/config', self._handle_save_config)
         self.app.router.add_get('////api/devices', self._handle_get_devices)
         self.app.router.add_get('////api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
+        self.app.router.add_get('////api/oauth/url', self._handle_oauth_url)
         self.app.router.add_get('////api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('////oauth/callback', self._handle_oauth_callback)
         # Home Assistant ingress can occasionally forward paths like "////".
@@ -295,6 +310,8 @@ class WebUIServer:
             return await self._handle_get_devices(request)
         if normalized == '/api/oauth/redirect-uri' and request.method == 'GET':
           return await self._handle_oauth_redirect_uri(request)
+        if normalized == '/api/oauth/url' and request.method == 'GET':
+          return await self._handle_oauth_url(request)
         if normalized == '/api/oauth/authorize' and request.method == 'GET':
             return await self._handle_oauth_start(request)
         if normalized == '/oauth/callback' and request.method == 'GET':
@@ -392,6 +409,16 @@ class WebUIServer:
         redirect_uri = self._resolve_redirect_uri(request)
         return web.json_response({"redirect_uri": redirect_uri})
 
+    def _build_oauth_url(self, request: web.Request) -> str:
+      redirect_uri = self._resolve_redirect_uri(request)
+      self.config.amazon_redirect_uri = redirect_uri
+      self.config.save()
+      return self.amazon_client.get_oauth_url()
+
+    async def _handle_oauth_url(self, request: web.Request) -> web.Response:
+      oauth_url = self._build_oauth_url(request)
+      return web.json_response({"oauth_url": oauth_url})
+
     # ── OAuth start ───────────────────────────────────────────
     async def _handle_oauth_start(self, request: web.Request) -> web.Response:
         """Build the Amazon OAuth URL.
@@ -399,13 +426,7 @@ class WebUIServer:
         The redirect_uri is constructed dynamically from the ingress path
         so the OAuth callback lands back on the correct ingress URL.
         """
-        redirect_uri = self._resolve_redirect_uri(request)
-
-        # Temporarily update config so the token exchange uses the same URI
-        self.config.amazon_redirect_uri = redirect_uri
-        self.config.save()
-
-        oauth_url = self.amazon_client.get_oauth_url()
+        oauth_url = self._build_oauth_url(request)
         logger.info(f"OAuth redirect → {oauth_url}")
         raise web.HTTPFound(location=oauth_url)
 
