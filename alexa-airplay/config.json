@@ -1,6 +1,6 @@
 {
   "name": "Amazon Echo AirPlay Bridge",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "slug": "alexa-airplay",
   "description": "Stream Apple Music to Amazon Echo devices via virtual AirPlay receivers",
   "url": "https://github.com/gorick1/Airplay/tree/main/alexa-airplay",
@@ -31,12 +31,14 @@
   "options": {
     "amazon_client_id": "",
     "amazon_client_secret": "",
+    "external_base_url": "",
     "airplay_port": 5001,
     "debug_logging": false
   },
   "schema": {
     "amazon_client_id": "str?",
     "amazon_client_secret": "str?",
+    "external_base_url": "str?",
     "airplay_port": "port?",
     "debug_logging": "bool?"
   }

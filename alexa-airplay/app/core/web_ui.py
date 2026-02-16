@@ -79,6 +79,8 @@ button{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:
   <div id="msg" class="msg"></div>
   <label for="redirect_uri">Allowed Return URL (copy this into Amazon)</label>
   <input type="text" id="redirect_uri" readonly placeholder="Loading redirect URI..."/>
+  <label for="external_base_url">External HA URL (optional, recommended)</label>
+  <input type="text" id="external_base_url" placeholder="https://home.garrettorick.com"/>
   <div class="btn-row" style="margin-top:8px">
     <button class="btn-primary" onclick="copyRedirectUri()">Copy Redirect URI</button>
     <button class="btn-primary" onclick="loadRedirectUri()">Refresh Redirect URI</button>
@@ -160,6 +162,7 @@ async function loadConfig() {
     const d = await r.json();
     document.getElementById('client_id').value     = d.amazon_client_id || '';
     document.getElementById('client_secret').value = d.amazon_client_secret || '';
+    document.getElementById('external_base_url').value = d.external_base_url || '';
 
     const hasAuth = d.authenticated === true;
     const badge = document.getElementById('authBadge');
@@ -178,7 +181,8 @@ async function saveConfig() {
   try {
     const body = JSON.stringify({
       amazon_client_id:     document.getElementById('client_id').value.trim(),
-      amazon_client_secret: document.getElementById('client_secret').value.trim()
+      amazon_client_secret: document.getElementById('client_secret').value.trim(),
+      external_base_url:    document.getElementById('external_base_url').value.trim()
     });
     const r = await fetch(apiUrl('api/config'), {
       method:  'POST',
@@ -356,6 +360,12 @@ class WebUIServer:
         if 'amazon_client_secret' in body and body['amazon_client_secret']:
             self.config.amazon_client_secret = body['amazon_client_secret'].strip()
             updated = True
+        if 'external_base_url' in body:
+            external_base_url = (body.get('external_base_url') or '').strip()
+            if external_base_url and not external_base_url.startswith(('http://', 'https://')):
+                external_base_url = f"https://{external_base_url}"
+            self.config.external_base_url = external_base_url
+            updated = True
 
         if updated:
             self.config.save()
@@ -378,6 +388,10 @@ class WebUIServer:
     def _resolve_redirect_uri(self, request: web.Request) -> str:
         """Build the exact redirect URI used for Amazon OAuth."""
         ingress_path = request.headers.get('X-Ingress-Path', '').rstrip('/')
+
+        external_base_url = (getattr(self.config, 'external_base_url', '') or '').strip().rstrip('/')
+        if external_base_url and ingress_path:
+            return f"{external_base_url}{ingress_path}/oauth/callback"
 
         if ingress_path:
             host = request.headers.get(

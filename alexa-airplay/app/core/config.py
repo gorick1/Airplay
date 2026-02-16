@@ -28,6 +28,7 @@ class Config:
         self.amazon_client_id = os.getenv("AMAZON_CLIENT_ID", "")
         self.amazon_client_secret = os.getenv("AMAZON_CLIENT_SECRET", "")
         self.amazon_redirect_uri = os.getenv("AMAZON_REDIRECT_URI", "")
+        self.external_base_url = os.getenv("EXTERNAL_BASE_URL", "")
         
         # AirPlay settings
         self.airplay_port = int(os.getenv("AIRPLAY_PORT", "5001"))
@@ -66,6 +67,9 @@ class Config:
                     if 'amazon_redirect_uri' in data and data['amazon_redirect_uri']:
                         logger.info(f"Setting amazon_redirect_uri from addon options")
                         self.amazon_redirect_uri = data['amazon_redirect_uri']
+                    if 'external_base_url' in data and data['external_base_url']:
+                        logger.info(f"Setting external_base_url from addon options")
+                        self.external_base_url = data['external_base_url']
                     if 'airplay_port' in data:
                         logger.info(f"Setting airplay_port from addon options: {data['airplay_port']}")
                         self.airplay_port = int(data['airplay_port'])
@@ -101,6 +105,7 @@ class Config:
                 "amazon_client_id": self.amazon_client_id,
                 "amazon_client_secret": self.amazon_client_secret,
                 "amazon_redirect_uri": self.amazon_redirect_uri,
+                "external_base_url": self.external_base_url,
                 "airplay_port": self.airplay_port,
                 "web_port": self.web_port,
                 "ha_url": self.ha_url,
@@ -117,6 +122,7 @@ class Config:
             "amazon_client_id": self.amazon_client_id,
             "amazon_client_secret": self.amazon_client_secret,  # UI needs to show current secret
             "amazon_redirect_uri": self.amazon_redirect_uri,
+            "external_base_url": self.external_base_url,
             "airplay_port": self.airplay_port,
             "web_port": self.web_port,
             "debug": self.debug,
