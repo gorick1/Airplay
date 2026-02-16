@@ -3,6 +3,7 @@ set -e
 
 # Use wrapper script if it exists, otherwise run directly
 if [ -f /data/start_app.sh ]; then
+    export LOG_LEVEL="DEBUG"
     exec /data/start_app.sh
 fi
 
