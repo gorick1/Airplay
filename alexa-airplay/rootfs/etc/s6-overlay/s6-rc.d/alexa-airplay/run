@@ -1,2 +1,2 @@
-#!/command/execlineb -P
+#!/bin/execlineb -P
 python3 -u /app/app/main.py
