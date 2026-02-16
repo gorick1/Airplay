@@ -24,7 +24,7 @@ RUN chmod +x run.sh
 RUN mkdir -p /data/config /data/logs
 
 # Expose ports
-EXPOSE 8000 5001 5353/udp
+EXPOSE 8000 5001
 
 # Run the application
 CMD [ "/app/run.sh" ]
