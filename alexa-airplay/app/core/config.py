@@ -27,12 +27,12 @@ class Config:
         # Amazon credentials - try environment first, then load from file
         self.amazon_client_id = os.getenv("AMAZON_CLIENT_ID", "")
         self.amazon_client_secret = os.getenv("AMAZON_CLIENT_SECRET", "")
-        self.amazon_redirect_uri = os.getenv("AMAZON_REDIRECT_URI", "http://localhost:8000/oauth/callback")
+        self.amazon_redirect_uri = os.getenv("AMAZON_REDIRECT_URI", "")
         
         # AirPlay settings
-        self.airplay_port = int(os.getenv("AIRPLAY_PORT", "5000"))
+        self.airplay_port = int(os.getenv("AIRPLAY_PORT", "5001"))
         self.airplay_mdns_port = 5353
-        self.web_port = 8000
+        self.web_port = int(os.getenv("WEB_PORT", "8099"))
         
         # Home Assistant
         self.ha_token = os.getenv("HA_TOKEN", "")

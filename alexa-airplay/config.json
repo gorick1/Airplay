@@ -1,6 +1,6 @@
 {
   "name": "Amazon Echo AirPlay Bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "slug": "alexa-airplay",
   "description": "Stream Apple Music to Amazon Echo devices via virtual AirPlay receivers",
   "url": "https://github.com/gorick1/Airplay/tree/main/alexa-airplay",
@@ -15,29 +15,29 @@
   "homeassistant_api": true,
   "hassio_api": true,
   "hassio_role": "default",
-  "init": true,
+  "init": false,
+  "ingress": true,
+  "ingress_port": 8099,
+  "ingress_entry": "/",
+  "panel_icon": "mdi:speaker-multiple",
+  "panel_title": "Alexa AirPlay",
+  "panel_admin": true,
   "ports": {
-    "8000/tcp": 8000,
     "5001/tcp": 5001
   },
   "ports_description": {
-    "8000/tcp": "Web UI and OAuth callback",
     "5001/tcp": "AirPlay RTSP/Audio streaming"
   },
   "privileged": [],
-  "panel_icon": "mdi:speaker-multiple",
-  "panel_title": "Alexa AirPlay",
   "options": {
     "amazon_client_id": "",
     "amazon_client_secret": "",
-    "amazon_redirect_uri": "http://localhost:8000/oauth/callback",
-    "airplay_port": 5000,
+    "airplay_port": 5001,
     "debug_logging": false
   },
   "schema": {
     "amazon_client_id": "str?",
     "amazon_client_secret": "str?",
-    "amazon_redirect_uri": "str?",
     "airplay_port": "port?",
     "debug_logging": "bool?"
   }

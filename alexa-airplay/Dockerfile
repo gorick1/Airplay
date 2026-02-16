@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 FROM ${BUILD_FROM}
 
 # Install Python and pip
@@ -7,7 +7,7 @@ RUN apk add --no-cache python3 py3-pip
 # Set working directory
 WORKDIR /app
 
-# Copy requirements
+# Copy requirements first (for docker layer caching)
 COPY requirements.txt .
 
 # Install dependencies
@@ -17,14 +17,13 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 COPY app ./app
 
 # Copy startup script
-COPY rootfs/start.sh /
+COPY rootfs/start.sh /run.sh
+RUN chmod +x /run.sh
 
 # Create data directories
-RUN mkdir -p /data/config /data/logs && \
-    chmod +x /start.sh
+RUN mkdir -p /data/config /data/logs
 
-# Expose ports
-EXPOSE 8000 5001
+# Ingress port (must match ingress_port in config.json)
+EXPOSE 8099 5001
 
-# Use ENTRYPOINT to ensure the script runs
-ENTRYPOINT ["/start.sh"]
+CMD ["/run.sh"]
