@@ -80,14 +80,25 @@ class DeviceManager:
                 logger.debug("Not authenticated, skipping device refresh")
                 return
             
+            logger.info("Refreshing Alexa devices...")
             alexa_devices = await self.amazon_client.get_devices()
+            logger.info(f"Amazon API returned {len(alexa_devices)} device(s)")
             
+            if not alexa_devices:
+                logger.warning("No devices returned from Amazon API")
+                return
+
             # Create virtual devices for each Alexa device
+            new_count = 0
             for device in alexa_devices:
-                device_id = device.get("id")
+                device_id = device.get("id", "")
                 device_name = device.get("name", f"Device {device_id}")
                 device_type = device.get("type", "device")
                 
+                if not device_id:
+                    logger.debug(f"Skipping device with no ID: {device}")
+                    continue
+
                 # Create or update virtual device
                 virtual_id = f"airplay_{device_id}"
                 if virtual_id not in self.devices:
@@ -98,9 +109,16 @@ class DeviceManager:
                         type="device"
                     )
                     self.devices[virtual_id] = virtual_device
-                    logger.info(f"Created virtual device: {device_name}")
+                    new_count += 1
+                    logger.info(f"  Created virtual device: {device_name} ({device_id})")
+                else:
+                    # Update name in case it changed
+                    self.devices[virtual_id].name = device_name
             
-            logger.debug(f"Device Manager: {len(self.devices)} virtual devices active")
+            logger.info(
+                f"Device refresh complete: {new_count} new, "
+                f"{len(self.devices)} total virtual devices"
+            )
         except Exception as e:
             logger.error(f"Error refreshing devices: {e}")
     

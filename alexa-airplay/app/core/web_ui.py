@@ -93,6 +93,13 @@ button{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:
     <button class="btn-primary" onclick="saveConfig()">Save Credentials</button>
     <button class="btn-success" id="authBtn" onclick="startOAuth()" disabled>Authorize with Amazon</button>
   </div>
+
+  <label for="oauth_code" style="margin-top:12px">Manual Authorization Code (if redirect blocked)</label>
+  <input type="text" id="oauth_code" placeholder="Paste the 'code' query value from Amazon redirect URL"/>
+  <div class="btn-row" style="margin-top:8px">
+    <button class="btn-primary" onclick="exchangeCode()">Complete Authorization</button>
+    <button class="btn-primary" onclick="document.getElementById('oauth_code').value='';">Clear</button>
+  </div>
 </div>
 
 <!-- Devices Card -->
@@ -221,20 +228,43 @@ async function startOAuth() {
   }
 }
 
+async function exchangeCode() {
+  try {
+    const code = document.getElementById('oauth_code').value.trim();
+    if (!code) { showMsg('Please paste the authorization code', false); return; }
+    const r = await fetch(apiUrl('api/oauth/exchange'), {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({code}),
+      credentials: 'same-origin'
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    showMsg(d.message || 'Authorization completed', true);
+    loadConfig();
+  } catch (e) {
+    showMsg('Authorization failed: ' + e.message, false);
+  }
+}
+
 /* ────────── Devices ────────── */
 async function loadDevices() {
   try {
-    const r = await fetch(apiUrl('api/devices'), {credentials:'same-origin'});
+    const r = await fetch(apiUrl('api/devices?refresh=1'), {credentials:'same-origin'});
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const ul = document.getElementById('deviceList');
+    if (!d.authenticated) {
+      ul.innerHTML = '<li><span class="device-state">Authorize with Amazon first to discover devices.</span></li>';
+      return;
+    }
     if (!d.devices || d.devices.length === 0) {
-      ul.innerHTML = '<li><span class="device-state">No devices found.</span></li>';
+      ul.innerHTML = '<li><span class="device-state">No devices found. Check add-on logs for details.</span></li>';
       return;
     }
     ul.innerHTML = d.devices.map(dev =>
       '<li><span class="device-name">' + (dev.name||dev.id) + '</span>' +
-      '<span class="device-state">' + (dev.state||'unknown') + '</span></li>'
+      '<span class="device-state">' + (dev.state||dev.type||'unknown') + '</span></li>'
     ).join('');
   } catch(e) {
     console.error('loadDevices:', e);
@@ -271,6 +301,7 @@ class WebUIServer:
         self.app.router.add_get('/api/devices', self._handle_get_devices)
         self.app.router.add_get('/api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('/api/oauth/url', self._handle_oauth_url)
+        self.app.router.add_post('/api/oauth/exchange', self._handle_oauth_exchange)
         self.app.router.add_get('/api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('/oauth/callback', self._handle_oauth_callback)
         # In some HA ingress paths, upstream sends 4 leading slashes.
@@ -282,6 +313,7 @@ class WebUIServer:
         self.app.router.add_get('////api/devices', self._handle_get_devices)
         self.app.router.add_get('////api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('////api/oauth/url', self._handle_oauth_url)
+        self.app.router.add_post('////api/oauth/exchange', self._handle_oauth_exchange)
         self.app.router.add_get('////api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('////oauth/callback', self._handle_oauth_callback)
         # Home Assistant ingress can occasionally forward paths like "////".
@@ -316,6 +348,8 @@ class WebUIServer:
           return await self._handle_oauth_redirect_uri(request)
         if normalized == '/api/oauth/url' and request.method == 'GET':
           return await self._handle_oauth_url(request)
+        if normalized == '/api/oauth/exchange' and request.method == 'POST':
+          return await self._handle_oauth_exchange(request)
         if normalized == '/api/oauth/authorize' and request.method == 'GET':
             return await self._handle_oauth_start(request)
         if normalized == '/oauth/callback' and request.method == 'GET':
@@ -377,9 +411,16 @@ class WebUIServer:
     # ── GET /api/devices ──────────────────────────────────────
     async def _handle_get_devices(self, request: web.Request) -> web.Response:
         try:
+            # If ?refresh=1 is passed, force an immediate device refresh first
+            if request.query.get("refresh"):
+                logger.info("Manual device refresh requested via API")
+                await self.device_manager.refresh_devices()
+
             devices = self.device_manager.get_all_devices()
             return web.json_response({
-                "devices": [d.to_dict() for d in devices]
+                "devices": [d.to_dict() for d in devices],
+                "count": len(devices),
+                "authenticated": self.amazon_client.authenticated,
             })
         except Exception as e:
             logger.error(f"Error getting devices: {e}")
@@ -474,7 +515,28 @@ class WebUIServer:
             <p><a href="./">Return to Dashboard</a></p></div></body></html>"""
 
         return web.Response(text=html, content_type='text/html')
+    async def _handle_oauth_exchange(self, request: web.Request) -> web.Response:
+        """Accept a pasted Amazon authorization code and exchange it for tokens.
 
+        This is a fallback for cases where the browser redirect to the
+        HA ingress callback is blocked by cross-site cookie/session rules.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        code = None
+        if isinstance(body, dict):
+            code = body.get('code')
+        if not code:
+            return web.json_response({"error": "Missing 'code' parameter"}, status=400)
+
+        success = await self.amazon_client.exchange_code_for_token(code)
+        if success:
+            return web.json_response({"success": True, "message": "Authorization successful"})
+        else:
+            return web.json_response({"success": False, "error": "Failed to exchange code with Amazon"}, status=400)
     # ── server lifecycle ──────────────────────────────────────
     async def start(self):
         port = int(getattr(self.config, 'web_port', 8099))
