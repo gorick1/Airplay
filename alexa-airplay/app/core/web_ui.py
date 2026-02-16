@@ -367,21 +367,18 @@ class WebUIServer:
                 'X-Forwarded-Host',
                 request.headers.get('Host', 'homeassistant.local')
             )
-            scheme = request.headers.get('X-Forwarded-Proto', '').strip()
+            # HA ingress is accessed from browser over HTTPS in this deployment.
+            # Force https to match Amazon Allowed Return URLs expectations.
+            scheme = 'https'
 
-            # Some ingress setups do not forward the external scheme reliably.
-            # Prefer scheme from browser-origin headers, and default to https.
-            if not scheme:
-                origin = request.headers.get('Origin', '').strip()
-                referer = request.headers.get('Referer', '').strip()
-                source = origin or referer
-                if source:
-                    parsed = urlparse(source)
-                    if parsed.scheme:
-                        scheme = parsed.scheme
-
-            if not scheme:
-                scheme = 'https'
+            # If browser headers provide an explicit scheme, prefer that.
+            origin = request.headers.get('Origin', '').strip()
+            referer = request.headers.get('Referer', '').strip()
+            source = origin or referer
+            if source:
+                parsed = urlparse(source)
+                if parsed.scheme:
+                    scheme = parsed.scheme
 
             return f"{scheme}://{host}{ingress_path}/oauth/callback"
 
