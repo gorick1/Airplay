@@ -24,8 +24,9 @@ class WebUIServer:
         self.runner: Optional[web.AppRunner] = None
         self.site: Optional[web.TCPSite] = None
     
-    async def _cors_middleware(self, app, handler):
-        """CORS middleware to allow POST requests from ingress"""
+    @staticmethod
+    async def _cors_middleware_factory(app, handler):
+        """CORS middleware factory for aiohttp"""
         async def middleware_handler(request):
             if request.method == 'OPTIONS':
                 return web.Response(status=200, headers={
@@ -45,8 +46,8 @@ class WebUIServer:
         try:
             logger.info(f"Starting Web UI on port {self.config.web_port}")
             
-            # Create aiohttp app with middleware
-            self.app = web.Application(middlewares=[self._cors_middleware])
+            # Create aiohttp app with CORS middleware
+            self.app = web.Application(middlewares=[self._cors_middleware_factory])
             
             # Setup routes
             self._setup_routes()
