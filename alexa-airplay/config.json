@@ -18,6 +18,7 @@
   "init": true,
   "ingress": true,
   "ingress_port": 8000,
+  "ingress_entry": "/",
   "ports": {
     "8000/tcp": 8000,
     "5001/tcp": 5001
