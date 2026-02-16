@@ -182,7 +182,14 @@ class WebUIServer:
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(config)
                     })
-                    .then(r => r.json())
+                    .then(r => {
+                        if (!r.ok) {
+                            return r.text().then(text => {
+                                throw new Error(`HTTP ${r.status}: ${text}`);
+                            });
+                        }
+                        return r.json();
+                    })
                     .then(data => {
                         if (data.status === 'success') {
                             showMessage('✓ Configuration saved! Please restart the addon for changes to take effect.', 'success');
@@ -240,17 +247,24 @@ class WebUIServer:
         """Save configuration"""
         try:
             data = await request.json()
+            logger.info(f"Received config data: {data}")
             
             if "amazon_client_id" in data:
                 self.config.amazon_client_id = data["amazon_client_id"]
             if "amazon_client_secret" in data:
                 self.config.amazon_client_secret = data["amazon_client_secret"]
+            if "airplay_port" in data:
+                self.config.airplay_port = data["airplay_port"]
             
             self.config.save()
+            logger.info("Configuration saved successfully")
             return web.json_response({"status": "success"})
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in request: {e}")
+            return web.json_response({"status": "error", "message": f"Invalid JSON: {str(e)}"}, status=400)
         except Exception as e:
-            logger.error(f"Error setting config: {e}")
-            return web.json_response({"status": "error", "message": str(e)}, status=400)
+            logger.error(f"Error setting config: {e}", exc_info=True)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
     
     async def handle_get_devices(self, request):
         """Get list of virtual devices"""
