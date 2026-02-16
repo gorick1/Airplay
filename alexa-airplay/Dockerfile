@@ -1,26 +1,26 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
 FROM ${BUILD_FROM}
 
-# Install only essential Python packages using apk (Alpine)
+# Install Python and pip
 RUN apk add --no-cache python3 py3-pip
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first
+# Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install dependencies
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Copy application code
+# Copy app code
 COPY app ./app
+
+# Copy s6-overlay service structure  
+COPY rootfs /
 
 # Create data directories
 RUN mkdir -p /data/config /data/logs
-
-# Copy s6-overlay service files
-COPY rootfs /
 
 # Expose ports
 EXPOSE 8000 5001
