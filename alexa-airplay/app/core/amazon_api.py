@@ -38,6 +38,26 @@ class AmazonAPIClient:
         self.authenticated = False
         self.session: Optional[aiohttp.ClientSession] = None
 
+        # Restore persisted tokens if available
+        self._restore_tokens()
+
+    def _restore_tokens(self):
+        """Restore tokens saved from a previous session."""
+        tokens = self.config.load_tokens()
+        if tokens and tokens.get("refresh_token"):
+            self.access_token = tokens.get("access_token")
+            self.refresh_token = tokens.get("refresh_token")
+            expiry_ts = tokens.get("expiry_ts", 0)
+            self.token_expiry = datetime.fromtimestamp(expiry_ts) if expiry_ts else None
+            self.authenticated = True
+            logger.info("Restored OAuth tokens from disk – authenticated")
+
+    def _persist_tokens(self):
+        """Save current tokens to disk."""
+        if self.access_token and self.refresh_token:
+            expiry_ts = self.token_expiry.timestamp() if self.token_expiry else 0
+            self.config.save_tokens(self.access_token, self.refresh_token, expiry_ts)
+
     async def init_session(self):
         if not self.session:
             self.session = aiohttp.ClientSession()
@@ -77,6 +97,7 @@ class AmazonAPIClient:
                     expires_in = token_data.get("expires_in", 3600)
                     self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
                     self.authenticated = True
+                    self._persist_tokens()
                     logger.info("Successfully authenticated with Amazon")
                     return True
                 else:
@@ -104,6 +125,7 @@ class AmazonAPIClient:
                     self.access_token = token_data.get("access_token")
                     expires_in = token_data.get("expires_in", 3600)
                     self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
+                    self._persist_tokens()
                     logger.info("Token refreshed successfully")
                     return True
                 else:

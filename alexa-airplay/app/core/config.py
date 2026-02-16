@@ -115,6 +115,34 @@ class Config:
             logger.info(f"Saved configuration to {config_file}")
         except Exception as e:
             logger.error(f"Failed to save config: {e}")
+
+    def save_tokens(self, access_token: str, refresh_token: str, expiry_ts: float):
+        """Persist OAuth tokens to a separate file so they survive restarts"""
+        token_file = self.config_dir / "tokens.json"
+        try:
+            token_data = {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expiry_ts": expiry_ts,
+            }
+            with open(token_file, 'w') as f:
+                json.dump(token_data, f, indent=2)
+            logger.info("Saved OAuth tokens to disk")
+        except Exception as e:
+            logger.error(f"Failed to save tokens: {e}")
+
+    def load_tokens(self) -> Optional[Dict[str, Any]]:
+        """Load persisted OAuth tokens"""
+        token_file = self.config_dir / "tokens.json"
+        if token_file.exists():
+            try:
+                with open(token_file, 'r') as f:
+                    data = json.load(f)
+                logger.info("Loaded persisted OAuth tokens from disk")
+                return data
+            except Exception as e:
+                logger.warning(f"Failed to load tokens: {e}")
+        return None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary for web UI"""
