@@ -299,6 +299,7 @@ class WebUIServer:
         self.app.router.add_get('/api/config', self._handle_get_config)
         self.app.router.add_post('/api/config', self._handle_save_config)
         self.app.router.add_get('/api/devices', self._handle_get_devices)
+        self.app.router.add_get('/api/debug/probe', self._handle_debug_probe)
         self.app.router.add_get('/api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('/api/oauth/url', self._handle_oauth_url)
         self.app.router.add_post('/api/oauth/exchange', self._handle_oauth_exchange)
@@ -425,6 +426,18 @@ class WebUIServer:
         except Exception as e:
             logger.error(f"Error getting devices: {e}")
             return web.json_response({"devices": [], "error": str(e)})
+
+    # ── GET /api/debug/probe ─────────────────────────────────
+    async def _handle_debug_probe(self, request: web.Request) -> web.Response:
+        """Probe all known Alexa API endpoints and return raw results for debugging."""
+        try:
+            if not self.amazon_client.authenticated:
+                return web.json_response({"error": "Not authenticated"}, status=401)
+            results = await self.amazon_client.probe_all_endpoints()
+            return web.json_response({"probe_results": results})
+        except Exception as e:
+            logger.error(f"Debug probe error: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     def _resolve_redirect_uri(self, request: web.Request) -> str:
         """Build the exact redirect URI used for Amazon OAuth."""

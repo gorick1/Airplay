@@ -23,7 +23,22 @@ AMAZON_API_BASE = "https://api.amazonalexa.com"
 DEVICE_ENDPOINTS = [
     {"url": "/v2/endpoints", "type": "endpoints_v2"},
     {"url": "/v1/endpoints", "type": "endpoints_v1"},
+    {"url": "/v2/devices", "type": "devices_v2"},
     {"url": "/v1/devices", "type": "devices_v1"},
+    {"url": "/v1/alexaApiGateway/devices", "type": "gateway_devices"},
+]
+
+# Additional probe URLs for debugging (used by probe_all_endpoints)
+PROBE_URLS = [
+    "/v2/endpoints",
+    "/v1/endpoints",
+    "/v2/devices",
+    "/v1/devices",
+    "/v1/alerts",
+    "/v1/me/profile",
+    "/v2/accounts",
+    "/v1/skills",
+    "/v1/alexaApiGateway",
 ]
 
 
@@ -275,3 +290,26 @@ class AmazonAPIClient:
         except Exception as e:
             logger.error(f"Error sending command: {e}")
             return False
+
+    async def probe_all_endpoints(self) -> List[Dict]:
+        """Probe many Alexa API URLs and return status/body for each (debug tool)."""
+        await self._ensure_valid_token()
+        await self.init_session()
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Accept": "application/json",
+        }
+        results = []
+        for path in PROBE_URLS:
+            url = f"{AMAZON_API_BASE}{path}"
+            try:
+                async with self.session.get(url, headers=headers) as resp:
+                    body = await resp.text()
+                    results.append({
+                        "url": url,
+                        "status": resp.status,
+                        "body_preview": body[:500],
+                    })
+            except Exception as e:
+                results.append({"url": url, "status": -1, "error": str(e)})
+        return results
