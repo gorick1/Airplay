@@ -65,7 +65,10 @@ class Config:
             config_data = {
                 "amazon_client_id": self.amazon_client_id,
                 "amazon_client_secret": self.amazon_client_secret,
+                "amazon_redirect_uri": self.amazon_redirect_uri,
                 "airplay_port": self.airplay_port,
+                "web_port": self.web_port,
+                "ha_url": self.ha_url,
             }
             with open(config_file, 'w') as f:
                 json.dump(config_data, f, indent=2)
