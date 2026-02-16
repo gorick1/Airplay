@@ -30,15 +30,23 @@ DEVICE_ENDPOINTS = [
 
 # Additional probe URLs for debugging (used by probe_all_endpoints)
 PROBE_URLS = [
-    "/v2/endpoints",
-    "/v1/endpoints",
-    "/v2/devices",
-    "/v1/devices",
-    "/v1/alerts",
-    "/v1/me/profile",
-    "/v2/accounts",
-    "/v1/skills",
-    "/v1/alexaApiGateway",
+    # Alexa API endpoints
+    "https://api.amazonalexa.com/v2/endpoints",
+    "https://api.amazonalexa.com/v1/endpoints",
+    "https://api.amazonalexa.com/v2/devices",
+    "https://api.amazonalexa.com/v1/devices",
+    "https://api.amazonalexa.com/v1/alerts",
+    "https://api.amazonalexa.com/v1/skills",
+    # Amazon user profile (LWA)
+    "https://api.amazon.com/user/profile",
+    # Alexa web app endpoints (used by alexa.amazon.com)
+    "https://alexa.amazon.com/api/devices-v2/device?cached=true",
+    "https://alexa.amazon.com/api/devices-v2/device",
+    "https://alexa.amazon.com/api/bootstrap",
+    # Alexa settings
+    "https://api.amazonalexa.com/v1/devices/G0911W079081206F/settings",
+    # Household
+    "https://alexa.amazon.com/api/household",
 ]
 
 
@@ -300,8 +308,7 @@ class AmazonAPIClient:
             "Accept": "application/json",
         }
         results = []
-        for path in PROBE_URLS:
-            url = f"{AMAZON_API_BASE}{path}"
+        for url in PROBE_URLS:
             try:
                 async with self.session.get(url, headers=headers) as resp:
                     body = await resp.text()
