@@ -1,10 +1,8 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
 FROM ${BUILD_FROM}
 
-# Install only essential Python packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+# Install only essential Python packages using apk (Alpine)
+RUN apk add --no-cache python3 py3-pip
 
 # Set working directory
 WORKDIR /app
