@@ -18,12 +18,12 @@
   "init": true,
   "ports": {
     "8000/tcp": 8000,
-    "5000/tcp": 5000,
+    "5001/tcp": 5001,
     "5353/udp": 5353
   },
   "ports_description": {
     "8000/tcp": "Web UI and OAuth callback",
-    "5000/tcp": "AirPlay RTSP/Audio streaming",
+    "5001/tcp": "AirPlay RTSP/Audio streaming",
     "5353/udp": "mDNS discovery"
   },
   "privileged": [],

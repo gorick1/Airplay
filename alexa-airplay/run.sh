@@ -14,7 +14,7 @@ mkdir -p "$CONFIG_DIR" "$LOG_DIR"
 export LOG_LEVEL="INFO"
 export AMAZON_CLIENT_ID=""
 export AMAZON_CLIENT_SECRET=""
-export AIRPLAY_PORT="5000"
+export AIRPLAY_PORT="5001"
 export HA_TOKEN="${SUPERVISOR_TOKEN}"
 export HA_URL="http://supervisor"
 
