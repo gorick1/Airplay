@@ -58,7 +58,7 @@ class WebUIServer:
     
     def _setup_routes(self):
         """Setup web routes"""
-        self.app.router.add_get("/", self.handle_index)
+        # Specific routes first
         self.app.router.add_get("/health", self.handle_health)
         self.app.router.add_get("/api/config", self.handle_get_config)
         self.app.router.add_post("/api/config", self.handle_set_config)
@@ -66,6 +66,8 @@ class WebUIServer:
         self.app.router.add_get("/api/devices", self.handle_get_devices)
         self.app.router.add_get("/api/oauth/authorize", self.handle_oauth_authorize)
         self.app.router.add_get("/oauth/callback", self.handle_oauth_callback)
+        # Generic routes last
+        self.app.router.add_get("/", self.handle_index)
         # Catch-all for malformed paths from ingress (e.g., ////)
         self.app.router.add_get("/{path_info:.*}", self.handle_wildcard)
     
