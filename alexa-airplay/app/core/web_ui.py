@@ -76,6 +76,12 @@ button{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:
 <div class="card">
   <h2>Amazon Developer Credentials</h2>
   <div id="msg" class="msg"></div>
+  <label for="redirect_uri">Allowed Return URL (copy this into Amazon)</label>
+  <input type="text" id="redirect_uri" readonly placeholder="Loading redirect URI..."/>
+  <div class="btn-row" style="margin-top:8px">
+    <button class="btn-primary" onclick="copyRedirectUri()">Copy Redirect URI</button>
+    <button class="btn-primary" onclick="loadRedirectUri()">Refresh Redirect URI</button>
+  </div>
   <label for="client_id">Client ID</label>
   <input type="text" id="client_id" placeholder="amzn1.application-oa2-client.…"/>
   <label for="client_secret">Client Secret</label>
@@ -117,6 +123,32 @@ function showMsg(text, ok) {
   el.className = ok ? 'msg msg-ok' : 'msg msg-err';
   el.style.display = 'block';
   if (ok) setTimeout(() => el.style.display = 'none', 5000);
+}
+
+async function loadRedirectUri() {
+  try {
+    const r = await fetch(apiUrl('api/oauth/redirect-uri'), {credentials:'same-origin'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    document.getElementById('redirect_uri').value = d.redirect_uri || '';
+  } catch(e) {
+    console.error('loadRedirectUri:', e);
+    document.getElementById('redirect_uri').value = 'Unable to detect redirect URI';
+  }
+}
+
+async function copyRedirectUri() {
+  const value = document.getElementById('redirect_uri').value;
+  if (!value) {
+    showMsg('Redirect URI is empty', false);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    showMsg('Redirect URI copied to clipboard', true);
+  } catch (e) {
+    showMsg('Copy failed. Please copy manually.', false);
+  }
 }
 
 /* ────────── Load config ────────── */
@@ -192,7 +224,10 @@ async function loadDevices() {
 }
 
 /* ────────── Init ────────── */
-document.addEventListener('DOMContentLoaded', loadConfig);
+document.addEventListener('DOMContentLoaded', () => {
+  loadConfig();
+  loadRedirectUri();
+});
 </script>
 </body>
 </html>"""
@@ -216,6 +251,7 @@ class WebUIServer:
         self.app.router.add_get('/api/config', self._handle_get_config)
         self.app.router.add_post('/api/config', self._handle_save_config)
         self.app.router.add_get('/api/devices', self._handle_get_devices)
+        self.app.router.add_get('/api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('/api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('/oauth/callback', self._handle_oauth_callback)
         # In some HA ingress paths, upstream sends 4 leading slashes.
@@ -225,6 +261,7 @@ class WebUIServer:
         self.app.router.add_get('////api/config', self._handle_get_config)
         self.app.router.add_post('////api/config', self._handle_save_config)
         self.app.router.add_get('////api/devices', self._handle_get_devices)
+        self.app.router.add_get('////api/oauth/redirect-uri', self._handle_oauth_redirect_uri)
         self.app.router.add_get('////api/oauth/authorize', self._handle_oauth_start)
         self.app.router.add_get('////oauth/callback', self._handle_oauth_callback)
         # Home Assistant ingress can occasionally forward paths like "////".
@@ -255,6 +292,8 @@ class WebUIServer:
             return await self._handle_save_config(request)
         if normalized == '/api/devices' and request.method == 'GET':
             return await self._handle_get_devices(request)
+        if normalized == '/api/oauth/redirect-uri' and request.method == 'GET':
+          return await self._handle_oauth_redirect_uri(request)
         if normalized == '/api/oauth/authorize' and request.method == 'GET':
             return await self._handle_oauth_start(request)
         if normalized == '/oauth/callback' and request.method == 'GET':
@@ -318,6 +357,28 @@ class WebUIServer:
             logger.error(f"Error getting devices: {e}")
             return web.json_response({"devices": [], "error": str(e)})
 
+        def _resolve_redirect_uri(self, request: web.Request) -> str:
+          """Build the exact redirect URI used for Amazon OAuth."""
+          ingress_path = request.headers.get('X-Ingress-Path', '').rstrip('/')
+
+          if ingress_path:
+            host = request.headers.get(
+              'X-Forwarded-Host',
+              request.headers.get('Host', 'homeassistant.local')
+            )
+            scheme = request.headers.get('X-Forwarded-Proto', 'http')
+            return f"{scheme}://{host}{ingress_path}/oauth/callback"
+
+          if self.config.amazon_redirect_uri:
+            return self.config.amazon_redirect_uri
+
+          host = request.headers.get('Host', 'localhost:8099')
+          return f"http://{host.rstrip('/')}/oauth/callback"
+
+        async def _handle_oauth_redirect_uri(self, request: web.Request) -> web.Response:
+          redirect_uri = self._resolve_redirect_uri(request)
+          return web.json_response({"redirect_uri": redirect_uri})
+
     # ── OAuth start ───────────────────────────────────────────
     async def _handle_oauth_start(self, request: web.Request) -> web.Response:
         """Build the Amazon OAuth URL.
@@ -325,19 +386,7 @@ class WebUIServer:
         The redirect_uri is constructed dynamically from the ingress path
         so the OAuth callback lands back on the correct ingress URL.
         """
-        ingress_path = request.headers.get('X-Ingress-Path', '')
-
-        if ingress_path:
-            # Build an absolute redirect URI that goes through the HA ingress
-            # The HA frontend is typically on the same host the user is visiting
-            host = request.headers.get('X-Forwarded-Host',
-                   request.headers.get('Host', 'localhost'))
-            scheme = request.headers.get('X-Forwarded-Proto', 'http')
-            redirect_uri = f"{scheme}://{host}{ingress_path}/oauth/callback"
-        elif self.config.amazon_redirect_uri:
-            redirect_uri = self.config.amazon_redirect_uri
-        else:
-            redirect_uri = "http://localhost:8099/oauth/callback"
+        redirect_uri = self._resolve_redirect_uri(request)
 
         # Temporarily update config so the token exchange uses the same URI
         self.config.amazon_redirect_uri = redirect_uri
