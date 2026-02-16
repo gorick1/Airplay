@@ -13,14 +13,18 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Copy app code
+# Copy application code
 COPY app ./app
 
-# Copy s6-overlay service structure  
-COPY rootfs /
+# Copy startup script
+COPY rootfs/start.sh /
 
 # Create data directories
-RUN mkdir -p /data/config /data/logs
+RUN mkdir -p /data/config /data/logs && \
+    chmod +x /start.sh
 
 # Expose ports
 EXPOSE 8000 5001
+
+# Run the startup script
+CMD ["/start.sh"]
