@@ -23,7 +23,7 @@ RUN chmod +x /run.sh
 # Create data directories
 RUN mkdir -p /data/config /data/logs
 
-# Ingress port (must match ingress_port in config.json)
-EXPOSE 8099 5001
+# Ingress port
+EXPOSE 8099
 
 CMD ["/run.sh"]
